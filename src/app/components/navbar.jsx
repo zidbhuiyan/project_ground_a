@@ -49,15 +49,17 @@ export default function Navbar() {
 
         .nav-links {
           display: flex;
-          gap: 25px;
+          gap: 28px;
         }
 
+        /* UPDATED: Bigger + Bolder */
         .nav-links a {
           text-decoration: none;
           color: #e5e5e5;
-          font-size: 1rem;
-          padding: 8px 14px;
-          border-radius: 8px;
+          font-size: 1.18rem;
+          font-weight: 700;
+          padding: 12px 18px;
+          border-radius: 10px;
           transition: all 0.35s ease;
         }
 
@@ -101,7 +103,7 @@ export default function Navbar() {
           }
 
           .nav-links a {
-            padding: 12px 10px;
+            padding: 14px 10px;
           }
 
           .menu-btn {
@@ -111,20 +113,21 @@ export default function Navbar() {
       `}</style>
 
       <nav className="navbar">
-        <div className="logo">
-          <img src="YOUR_LOGO.png" alt="Ground Alpha Logo" />
-          <span>Ground Alpha</span>
-        </div>
+        <a href="/">
+          <div className="logo">
+            <img src="YOUR_LOGO.png" alt="Ground Alpha Logo" />
+            <span>Ground Alpha</span>
+          </div>
+        </a>
 
         <div className="menu-btn" onClick={() => setOpen(!open)}>
           &#9776;
         </div>
 
         <div className={`nav-links ${open ? "show" : ""}`}>
-          <a href="#home">Home</a>
+          <a href="/">Home</a>
           <a href="#about">About the Turf</a>
-          <a href="#slots">Available Slots</a>
-
+          <a href="/available-slots">Available Slots</a>
           <a href="#event">Events</a>
         </div>
       </nav>

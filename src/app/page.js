@@ -1,5 +1,6 @@
 import React from "react";
+import Home from "./components/home";
 
-export default function Home() {
-  return <div>Hello Word</div>;
+export default function Page() {
+  return <Home />;
 }
