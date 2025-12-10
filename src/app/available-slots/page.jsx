@@ -3,18 +3,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 /**
- Final Available Slots Page (Dark theme, Premium, Centered)
- - All 3 phases: Day / Night / Midnight (slots from image)
- - Weekday: Sun,Mon,Tue,Wed  | Weekend: Thu,Fri,Sat
- - Date picker on top (blocks past dates)
- - If selected date is today, past slot start times are disabled/greyed
- - Prices auto-update based on weekday/weekend
- - Everything centered, larger & bolder typography, big date bar
- - Deterministic date formatting (no locale-sensitive functions) to avoid hydration mismatch
+ AvailableSlotsPage - Premium Neon Glow (one-file)
+ - Design A: neon green on dark
+ - Large cards, focusable, keyboard accessible
+ - Date picker blocks past dates
+ - Past slots disabled for today
+ - Deterministic date formatting to avoid hydration issues
 */
 
 export default function AvailableSlotsPage() {
-  // ---- date helpers (deterministic) ----
+  /* ---------- Deterministic date helpers ---------- */
   const MONTHS = [
     "Jan",
     "Feb",
@@ -43,29 +41,33 @@ export default function AvailableSlotsPage() {
   function todayISO() {
     return new Date().toISOString().slice(0, 10);
   }
-
   function formatNiceDet(dateISO) {
-    if (!dateISO) return "";
-    const d = new Date(dateISO + "T00:00:00");
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = MONTHS[d.getMonth()];
-    const year = d.getFullYear();
-    const short = WEEKDAY_SHORT[d.getDay()];
-    return `${short}, ${day} ${month} ${year}`; // e.g. Tue, 09 Dec 2025
+    try {
+      const d = new Date(dateISO + "T00:00:00");
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = MONTHS[d.getMonth()];
+      const year = d.getFullYear();
+      const short = WEEKDAY_SHORT[d.getDay()];
+      return `${short}, ${day} ${month} ${year}`;
+    } catch {
+      return dateISO;
+    }
   }
-
   function getDayNameDet(dateISO) {
-    if (!dateISO) return "";
-    const d = new Date(dateISO + "T00:00:00");
-    return WEEKDAY_LONG[d.getDay()];
+    try {
+      const d = new Date(dateISO + "T00:00:00");
+      return WEEKDAY_LONG[d.getDay()];
+    } catch {
+      return "";
+    }
   }
 
-  // ---- phases & slots ----
+  /* ---------- Phase and slot data ---------- */
   const phases = useMemo(
     () => [
       {
         key: "day",
-        title: "Day (06:00 AM - 03:50 PM)",
+        title: "Day — 06:00 AM - 03:50 PM",
         weekdayPrice: 2800,
         weekendPrice: 3300,
         slots: [
@@ -79,7 +81,7 @@ export default function AvailableSlotsPage() {
       },
       {
         key: "night",
-        title: "Night (04:00 PM - 12:10 AM)",
+        title: "Night — 04:00 PM - 12:10 AM",
         weekdayPrice: 4000,
         weekendPrice: 4500,
         slots: [
@@ -92,7 +94,7 @@ export default function AvailableSlotsPage() {
       },
       {
         key: "midnight",
-        title: "Midnight (12:20 AM - 05:10 AM)",
+        title: "Midnight — 12:20 AM - 05:10 AM",
         weekdayPrice: 3500,
         weekendPrice: 4000,
         slots: [
@@ -105,9 +107,10 @@ export default function AvailableSlotsPage() {
     []
   );
 
-  // ---- state ----
+  /* ---------- State ---------- */
   const [selectedDate, setSelectedDate] = useState(() => todayISO());
   const [isWeekendForDate, setIsWeekendForDate] = useState(false);
+  const [flashId, setFlashId] = useState(null); // for small feedback animation
 
   useEffect(() => {
     const d = new Date(selectedDate + "T00:00:00");
@@ -115,41 +118,40 @@ export default function AvailableSlotsPage() {
     setIsWeekendForDate(dow === 4 || dow === 5 || dow === 6); // Thu(4), Fri(5), Sat(6)
   }, [selectedDate]);
 
-  // ---- time parsing (convert "06:00 AM" to 24h numbers) ----
+  useEffect(() => {
+    // small mount animation hook
+    const el = document.querySelector(".neon-wrap");
+    if (el) el.classList.add("enter");
+  }, []);
+
+  /* ---------- Time helpers ---------- */
   function parseTimePart(timeStr) {
-    // e.g. "06:00 AM" or "12:20 AM" or "04:00 PM"
+    // "06:00 AM" -> {hours:6, minutes:0}
     const [time, meridian] = timeStr.trim().split(" ");
     const [hh, mm] = time.split(":").map(Number);
-    let hours = hh % 12; // 12 -> 0 for AM/PM logic
+    let hours = hh % 12;
     if (meridian && meridian.toUpperCase() === "PM") hours += 12;
     return { hours, minutes: mm };
   }
 
-  // ---- determine if a slot start is past when selected date is today ----
-  function slotIsPast(selectedDateISO, slotStr) {
-    // slotStr example: "06:00 AM - 07:30 AM"
-    const startPart = slotStr.split("-")[0].trim(); // "06:00 AM"
-    const { hours, minutes } = parseTimePart(startPart);
-
-    // Build slot start Date on selectedDate
-    // Note: For times after midnight (00:xx) this is still the same calendar day early morning.
-    const slotDate = new Date(selectedDateISO + "T00:00:00");
-    slotDate.setHours(hours, minutes, 0, 0);
-
-    const now = new Date();
+  function slotIsPast(dateISO, slotStr) {
+    // Only mark past when selected date is today
     const todayIso = todayISO();
-
-    // Only mark as past if selected date is today
-    if (selectedDateISO !== todayIso) return false;
-
-    // If slotDate <= now, it's past/unavailable
+    if (dateISO !== todayIso) return false;
+    const startPart = slotStr.split("-")[0].trim();
+    const { hours, minutes } = parseTimePart(startPart);
+    const slotDate = new Date(dateISO + "T00:00:00");
+    slotDate.setHours(hours, minutes, 0, 0);
+    const now = new Date();
     return slotDate <= now;
   }
 
-  // ---- booking placeholder ----
   function handleBook(slotStr, phase) {
     const price = isWeekendForDate ? phase.weekendPrice : phase.weekdayPrice;
-    // Replace this with real booking flow later
+    // tiny visual feedback
+    setFlashId(Math.random().toString(36).slice(2, 8));
+    setTimeout(() => setFlashId(null), 900);
+    // placeholder action (replace with real booking flow)
     alert(
       `Booking placeholder\nDate: ${formatNiceDet(
         selectedDate
@@ -159,134 +161,147 @@ export default function AvailableSlotsPage() {
     );
   }
 
-  // ---- styles + rendering ----
+  /* ---------- Render ---------- */
   return (
     <>
+      {/* Google fonts for neon / headings */}
+      <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700;900&family=Orbitron:wght@600;700;900&display=swap"
+        rel="stylesheet"
+      />
+
       <style>{`
         :root{
-          --bg1: #06120b;
-          --bg2: #071a0f;
+          --bg-dark: #03120a;
           --panel: rgba(255,255,255,0.03);
-          --accent: #12d37f;
+          --neon: #00ff84;
+          --neon-2: #00ffaa;
           --muted: rgba(255,255,255,0.85);
+          --glass: rgba(255,255,255,0.04);
+        }
+        *{box-sizing: border-box}
+        html,body{margin:0;padding:0}
+
+        /* Page wrap (centered) */
+        .neon-page {
+          display:flex;
+          justify-content:center;
+          padding: 28px 18px 20px;
+          background: linear-gradient(180deg, #04130b 0%, #071a10 100%);
+          color: white;
+          min-height: auto; /* do not force huge min-height */
         }
 
-        * { box-sizing: border-box; }
-        html,body { margin:0; padding:0; }
-
-        .page {
-            background: linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
-            color: white;
-            display: flex;
-            justify-content: center;
-            padding: 30px 18px 10px;    /* ⬅️ Reduced bottom padding */
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-          
-            /* REMOVE the minimum height so no forced empty space */
-            min-height: 0;              /* ⬅️ Important fix */
-          }
-
-        .wrap {
-          width: 100%;
+        .neon-wrap {
+          width:100%;
           max-width: 1100px;
           display:flex;
           flex-direction:column;
-          align-items:center;
+          gap:20px;
+          transform: translateY(14px);
+          opacity: 0;
+          transition: transform 600ms cubic-bezier(.2,.9,.2,1), opacity 600ms ease;
         }
+        .neon-wrap.enter { transform: translateY(0); opacity:1; }
 
-        /* BIG DATE BAR */
-        .date-bar {
-          width: 100%;
-          max-width: 820px;
-          background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-          border: 1px solid rgba(255,255,255,0.04);
-          padding: 22px 28px;
-          border-radius: 14px;
+        /* Hero / date bar */
+        .hero {
           display:flex;
+          gap:20px;
           align-items:center;
-          justify-content: space-between;
-          gap: 16px;
-          box-shadow: 0 20px 50px rgba(0,0,0,0.6);
-          margin-bottom:18px;
+          justify-content:space-between;
+          background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+          border: 1px solid var(--glass);
+          padding: 22px;
+          border-radius: 14px;
+          box-shadow: 0 30px 60px rgba(0,0,0,0.6);
         }
 
-        .date-left {
+        .hero-left {
           display:flex;
           flex-direction:column;
-          gap:2px;
+          gap:4px;
         }
-
-        .date-day {
-          font-size: 1.05rem;
+        .hero-title {
+          font-family: "Orbitron", sans-serif;
+          letter-spacing: 1px;
+          color: var(--neon);
+          font-size: 1.6rem;
+          font-weight: 800;
+          text-shadow: 0 6px 30px rgba(0,255,136,0.08), 0 0 10px rgba(0,255,136,0.06);
+        }
+        .hero-sub {
           color: #bfe7cf;
-          font-weight: 700;
-        }
-
-        .date-full {
-          font-size: 1.5rem;
-          font-weight: 900;
-          letter-spacing: 0.6px;
-          text-shadow: 2px 2px 12px rgba(0,0,0,0.6);
-        }
-
-        .date-right { display:flex; align-items:center; gap:12px; }
-
-        .date-input {
-            appearance: none;
-            width: 275px;
-            border: 1px solid rgba(255,255,255,0.18);
-            background: rgba(255,255,255,0.12);
-            color: white;
-            padding: 14px 16px;
-            border-radius: 10px;
-            font-weight: 700;
-            font-size: 1.25rem;
-            text-align: center;               /* ⬅️ DATE TEXT CENTERED */
-            backdrop-filter: blur(4px);
-            box-shadow: 0 0 10px rgba(255,255,255,0.08);
-          }
-
-          
-
-        .info-row {
-          margin-top:10px;
-          color:#cfeedd;
-          font-weight:600;
+          font-weight:700;
           font-size:0.95rem;
         }
 
-        /* main title */
-        .title {
-          text-align:center;
-          margin: 20px 0 8px;
-        }
-        .title h1 {
-          font-size: 2rem;
-          margin:0;
-          font-weight:900;
-          text-shadow: 2px 2px 12px rgba(0,0,0,0.6);
-        }
-        .title p { margin:8px 0 0; color:#bfe7cf; font-weight:600; }
-
-        /* sections */
-        .sections {
-          width:100%;
-          margin-top:20px;
+        .date-block {
           display:flex;
-          flex-direction:column;
-          gap:28px;
+          gap:12px;
           align-items:center;
         }
-
-        .phase {
-          width:100%;
-          max-width: 980px;
-          background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-          border-radius:12px;
-          padding:18px;
-          border: 1px solid rgba(255,255,255,0.04);
+        .date-big {
+          font-weight:900;
+          color: var(--muted);
+          font-size: 1.05rem;
+          text-shadow: 0 6px 20px rgba(0,0,0,0.6);
         }
 
+        .date-input {
+            appearance: none;
+            background: linear-gradient(180deg, rgba(60,40,10,0.35), rgba(45,30,5,0.28));
+            border: 1px solid rgba(200,140,60,0.45);
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-weight: 800;
+            font-size: 1rem;
+            color: #ffe9c4;
+            width: 260px;
+            text-align: center;
+          
+            /* matching bronze glow */
+            box-shadow: 
+              0 6px 30px rgba(45,30,5,0.6),
+              0 0 14px rgba(200,140,60,0.18) inset;
+          }
+          
+        .date-input:focus { outline: 2px solid rgba(0,255,136,0.14); box-shadow: 0 10px 40px rgba(0,255,136,0.06); }
+
+        /* Controls / note */
+        .mode-pill {
+          padding:8px 12px;
+          border-radius:999px;
+          background: linear-gradient(90deg, rgba(0,255,136,0.06), rgba(0,255,136,0.02));
+          border: 1px solid rgba(0,255,136,0.06);
+          color: var(--neon);
+          font-weight:900;
+          letter-spacing:0.6px;
+        }
+
+        /* Sections title */
+        .page-title {
+          text-align:center;
+          font-family: "Orbitron", sans-serif;
+          color: var(--neon-2);
+          font-size: 2rem;
+          font-weight:900;
+          text-shadow: 0 8px 30px rgba(0,255,170,0.06), 0 0 18px rgba(0,255,170,0.06);
+        }
+        .page-sub {
+          text-align:center;
+          color:#cfeedd;
+          font-weight:700;
+        }
+
+        /* Phase card */
+        .phase {
+          background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+          border-radius: 12px;
+          padding: 18px;
+          border: 1px solid rgba(0,0,0,0.45);
+          box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+        }
         .phase-head {
           display:flex;
           justify-content:space-between;
@@ -294,119 +309,178 @@ export default function AvailableSlotsPage() {
           gap:12px;
           margin-bottom:14px;
         }
-
         .phase-title {
-          font-size: 1.1rem;
           font-weight:900;
           letter-spacing:0.6px;
+          color: #e6ffe9;
+          font-size:1.05rem;
         }
-
         .phase-price {
-          background: rgba(31,138,42,0.10);
-          color: var(--accent);
+          background: linear-gradient(180deg, rgba(0,255,136,0.06), rgba(0,255,136,0.02));
+          color: var(--neon);
           padding:8px 12px;
           border-radius:10px;
-          font-weight:800;
+          font-weight:900;
         }
 
+        /* Slots grid - big cards */
         .slots-grid {
           display:grid;
           grid-template-columns: repeat(2, 1fr);
-          gap:12px;
+          gap:16px;
         }
 
-        .slot {
-          background: rgba(255,255,255,0.03);
-          padding:14px;
-          border-radius:10px;
-          display:flex;
-          flex-direction:column;
-          gap:8px;
-          border: 1px solid rgba(255,255,255,0.03);
-          transition: transform 0.12s ease, box-shadow 0.12s ease;
-        }
+        .slot-card {
+            background: linear-gradient(180deg, rgba(60,40,10,0.9), rgba(45,30,5,0.75));
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid rgba(200,140,60,0.35);
+            transition: transform 220ms cubic-bezier(.2,.9,.2,1),
+                        box-shadow 220ms ease,
+                        border-color 220ms ease;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: 0 6px 18px rgba(60,40,10,0.7);
+          }
+          
+          .slot-card::before {
+            content: "";
+            width: 6px;
+            border-radius: 6px;
+            background: linear-gradient(180deg, #ffb55a, #d98a30);
+          }
+          
+          
+          
 
-        .slot:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-        }
-
-        .slot.unavailable {
-          background: rgba(120,120,120,0.12);
-          color: #d0d0d0;
-          border: 1px solid rgba(255,255,255,0.02);
-        }
-
-        .slot-time {
-          font-weight:800;
-          font-size:1rem;
-        }
-
-        .slot-row {
+        .slot-info {
           display:flex;
           justify-content:space-between;
           align-items:center;
         }
 
+        .slot-time {
+          font-weight:900;
+          font-size:1.08rem;
+          color: #dfffe8;
+          text-shadow: 0 6px 26px rgba(0,255,136,0.04);
+        }
         .slot-price {
           font-weight:900;
-          color:#e6ffe9;
-          font-size:0.98rem;
+          color: var(--neon);
+          font-size:1.03rem;
+          letter-spacing:0.6px;
         }
 
-        .slot-available {
-          font-size:0.87rem;
-          color:#cfeedd;
-          font-weight:700;
+        .slot-meta {
+          display:flex;
+          justify-content:space-between;
+          align-items:center;
+          gap:12px;
         }
 
-        .book-btn {
-          margin-top:8px;
-          padding:10px 12px;
-          border-radius:8px;
-          border:none;
-          font-weight:900;
-          cursor:pointer;
+        .slot-state {
+          padding:6px 10px;
+          border-radius: 999px;
+          font-weight:800;
+          font-size:0.85rem;
+          color:#0b2a18;
+          background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.85));
+        }
+
+        .slot-actions {
+          display:flex;
+          gap:10px;
+          margin-top:6px;
+          align-items:center;
+        }
+
+        .btn-book {
           background: linear-gradient(180deg,#ffd84d,#f6c42d);
-          color:#000;
+          border:none;
+          padding:10px 14px;
+          font-weight:900;
+          border-radius:8px;
+          cursor:pointer;
+          box-shadow: 0 8px 30px rgba(246,196,45,0.12);
+          transition: transform 120ms ease;
+        }
+        .btn-book:active { transform: translateY(2px); }
+
+        .slot-card:hover {
+          transform: translateY(-8px);
+          box-shadow: 0 28px 70px rgba(0,0,0,0.7), 0 0 40px rgba(0,255,136,0.04);
+          border-color: rgba(0,255,136,0.12);
         }
 
-        .book-btn[disabled] {
-          background: rgba(200,200,200,0.6);
+        .slot-card:focus-within {
+          outline: 3px solid rgba(0,255,136,0.08);
+          transform: translateY(-8px);
+          box-shadow: 0 28px 70px rgba(0,0,0,0.7), 0 0 60px rgba(0,255,136,0.06);
+        }
+
+        /* unavailable */
+        .slot-card.unavailable {
+          filter: grayscale(0.48) contrast(0.9) brightness(0.9);
+          opacity: 0.72;
+        }
+        .slot-card.unavailable .btn-book {
+          background: linear-gradient(180deg,#bdbdbd,#9f9f9f);
           cursor:not-allowed;
-          color:#444;
         }
 
+        /* flash feedback small ring */
+        .flash {
+          position:absolute;
+          inset:0;
+          pointer-events:none;
+          border-radius:12px;
+          box-shadow: 0 0 0 2px rgba(0,255,136,0.14), 0 0 40px rgba(0,255,136,0.06);
+          animation: flashAnim 700ms ease-out forwards;
+        }
+        @keyframes flashAnim {
+          from { opacity:1; transform:scale(0.98); }
+          to { opacity:0; transform:scale(1.06); }
+        }
+
+        /* small note */
         .note {
-          margin-top:18px;
-          color:#bcdcc7;
-          font-size:13px;
+          color:#a9dec2;
           text-align:center;
+          font-weight:600;
+          margin-top:6px;
         }
 
+        /* responsive */
         @media (max-width:920px) {
           .slots-grid { grid-template-columns: 1fr; }
-          .date-bar { padding:18px; flex-direction:column; align-items:flex-start; gap:10px; }
-          .date-right { width:100%; justify-content:flex-end; }
-          .date-input { width: 100%; max-width:220px; }
+          .hero { flex-direction: column; gap:12px; align-items:flex-start; }
+          .date-input { width:100%; max-width:320px; }
         }
       `}</style>
 
-      <main className="page" aria-live="polite">
-        <div className="wrap">
-          {/* Big date bar */}
-          <div className="date-bar" role="region" aria-label="date selector">
-            <div className="date-left" aria-hidden="false">
-              <div className="date-day">{getDayNameDet(selectedDate)}</div>
-              <div className="date-full">{formatNiceDet(selectedDate)}</div>
-              <div className="info-row">Pick a date (today onward)</div>
+      <main className="neon-page" aria-live="polite">
+        <div
+          className="neon-wrap"
+          role="region"
+          aria-label="Available slots container"
+        >
+          {/* HERO / DATE PICKER */}
+          <div className="hero" role="region" aria-label="Booking header">
+            <div className="hero-left">
+              <div className="hero-title">Ground Alpha — Book a Slot</div>
+              <div className="hero-sub">
+                Pick a date and time — tap a card to book
+              </div>
             </div>
 
-            <div className="date-right">
+            <div className="date-block" aria-hidden="false">
+              <div className="date-big">{formatNiceDet(selectedDate)}</div>
               <input
-                aria-label="Choose booking date"
                 className="date-input"
                 type="date"
+                aria-label="Choose booking date"
                 value={selectedDate}
                 min={todayISO()}
                 onChange={(e) => setSelectedDate(e.target.value)}
@@ -414,22 +488,22 @@ export default function AvailableSlotsPage() {
             </div>
           </div>
 
-          {/* Page title */}
-          <div className="title" role="heading" aria-level={1}>
-            <h1>Available Slots</h1>
-            <p>
-              Pricing mode:{" "}
+          {/* TITLE */}
+          <div>
+            <div className="page-title">Available Slots</div>
+            <div className="page-sub">
+              Mode:{" "}
               <strong style={{ color: "#fff" }}>
                 {isWeekendForDate ? "Weekend" : "Weekday"}
               </strong>{" "}
               — (Weekend = Thu/Fri/Sat)
-            </p>
+            </div>
           </div>
 
-          {/* Sections */}
-          <div className="sections" role="main">
+          {/* SECTIONS */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             {phases.map((phase) => {
-              const phasePrice = isWeekendForDate
+              const price = isWeekendForDate
                 ? phase.weekendPrice
                 : phase.weekdayPrice;
               return (
@@ -442,35 +516,63 @@ export default function AvailableSlotsPage() {
                     <div id={`phase-${phase.key}`} className="phase-title">
                       {phase.title}
                     </div>
-                    <div className="phase-price">{phasePrice} TAKA</div>
+                    <div className="phase-price">{price} TAKA</div>
                   </div>
 
                   <div className="slots-grid" role="list">
                     {phase.slots.map((slotStr, idx) => {
                       const past = slotIsPast(selectedDate, slotStr);
+                      const keyId = `${phase.key}-${idx}`;
                       return (
                         <div
-                          className={`slot ${past ? "unavailable" : ""}`}
-                          key={idx}
+                          className={`slot-card ${past ? "unavailable" : ""}`}
+                          key={keyId}
                           role="listitem"
                           aria-disabled={past}
                         >
-                          <div className="slot-time">{slotStr}</div>
-
-                          <div className="slot-row">
-                            <div className="slot-price">{phasePrice} TAKA</div>
-                            <div className="slot-available">
-                              {past ? "Unavailable" : "Available"}
+                          <div className="slot-info">
+                            <div
+                              className="slot-time"
+                              aria-label={`Time ${slotStr}`}
+                            >
+                              {slotStr}
+                            </div>
+                            <div
+                              className="slot-price"
+                              aria-label={`Price ${price} TAKA`}
+                            >
+                              {price} TAKA
                             </div>
                           </div>
 
-                          <button
-                            className="book-btn"
-                            disabled={past}
-                            onClick={() => handleBook(slotStr, phase)}
-                          >
-                            {past ? "Unavailable" : "Book Now"}
-                          </button>
+                          <div className="slot-meta">
+                            <div className="slot-state">
+                              {past ? "Unavailable" : "Available"}
+                            </div>
+
+                            <div className="slot-actions">
+                              <button
+                                className="btn-book"
+                                onClick={() =>
+                                  !past && handleBook(slotStr, phase)
+                                }
+                                disabled={past}
+                                aria-disabled={past}
+                                aria-label={
+                                  past
+                                    ? `Unavailable ${slotStr}`
+                                    : `Book ${slotStr}`
+                                }
+                              >
+                                {past ? "Unavailable" : "Book Now"}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* flash feedback overlay when booking triggered */}
+                          {flashId && (
+                            <div className="flash" aria-hidden="true"></div>
+                          )}
                         </div>
                       );
                     })}
@@ -482,78 +584,10 @@ export default function AvailableSlotsPage() {
 
           <div className="note">
             Past times (for today) are automatically blocked. Choose a future
-            date to book any slot.
+            date to open more slots.
           </div>
         </div>
       </main>
     </>
   );
-}
-
-/* ---------- helper functions (deterministic) ---------- */
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-function parseTimePart(timeStr) {
-  const [time, meridian] = timeStr.trim().split(" ");
-  const [hh, mm] = time.split(":").map(Number);
-  let hours = hh % 12;
-  if (meridian && meridian.toUpperCase() === "PM") hours += 12;
-  return { hours, minutes: mm };
-}
-function slotIsPast(selectedDateISO, slotStr) {
-  const startPart = slotStr.split("-")[0].trim();
-  const { hours, minutes } = parseTimePart(startPart);
-  const slotDate = new Date(selectedDateISO + "T00:00:00");
-  slotDate.setHours(hours, minutes, 0, 0);
-
-  const now = new Date();
-  const todayIso = todayISO();
-  if (selectedDateISO !== todayIso) return false;
-  return slotDate <= now;
-}
-function formatNiceDet(dateISO) {
-  try {
-    const MONTHS = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const d = new Date(dateISO + "T00:00:00");
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = MONTHS[d.getMonth()];
-    const year = d.getFullYear();
-    const short = WEEKDAY_SHORT[d.getDay()];
-    return `${short}, ${day} ${month} ${year}`;
-  } catch {
-    return dateISO;
-  }
-}
-function getDayNameDet(dateISO) {
-  try {
-    const WEEKDAY_LONG = [
-      "Sunday",
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-    ];
-    const d = new Date(dateISO + "T00:00:00");
-    return WEEKDAY_LONG[d.getDay()];
-  } catch {
-    return "";
-  }
 }
